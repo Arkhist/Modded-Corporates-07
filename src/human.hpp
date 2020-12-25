@@ -2,6 +2,8 @@
 
 #include "vectorMath.hpp"
 
+#define ACCEL_STRENGTH 10
+
 struct Player;
 
 struct Human {
@@ -11,8 +13,14 @@ struct Human {
     
     int health;
     int bleeding;
+
+    float yaw;
+    float pitch;
+    Vect3D facingDirection;
     
     Vect3D position;
+    Vect3D speed;
+    Vect3D acceleration;
 
     Player* player;
 };

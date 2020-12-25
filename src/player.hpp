@@ -39,6 +39,14 @@ struct PlayerAction {
     int actionData;
 };
 
+struct PlayerControls {
+    float rightwards;
+    float forwards;
+    float yaw;
+    float pitch;
+    float inputStorage;
+};
+
 struct Player {
     int id;
     int status;
@@ -57,6 +65,8 @@ struct Player {
     int processedActions;
     int actions;
     PlayerAction actionData[64];
+
+    PlayerControls controls;
 
     Human* human;
 };

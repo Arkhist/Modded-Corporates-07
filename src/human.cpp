@@ -23,6 +23,9 @@ Human* createHuman(Server* server, Vect3D position, Player* p)
     humanSlot->isPlayed = 1;
 
     copyVect(&humanSlot->position, &position);
+    zeroVect(&humanSlot->speed);
+    zeroVect(&humanSlot->acceleration);
+    zeroVect(&humanSlot->facingDirection);
 
     return humanSlot;
 }

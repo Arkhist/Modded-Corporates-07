@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <bit>
 
+#include <math.h>
+
 #include "server.hpp"
 #include "networking.hpp"
 
@@ -41,7 +43,23 @@ void handleClientUpdate(Server* server, RecvContainer* ctn)
     if (p->status == PlayerStatus::LOADING && curGame == server->curGame) {
         p->status = PlayerStatus::LOBBY;
     }
-    readNextInt4(ctn);readNextInt4(ctn);readNextInt4(ctn);readNextInt4(ctn);readNextInt4(ctn);readNextInt4(ctn);readNextInt4(ctn);readNextInt4(ctn);readNextInt4(ctn);
+    readNextInt4(ctn); // idk2
+    int tmp = readNextInt4(ctn);
+    float val = *((float*)&tmp);
+    p->controls.rightwards = val;
+    readNextInt4(ctn); // idk1
+    tmp = readNextInt4(ctn);
+    val = *((float*)&tmp);
+    p->controls.forwards = val;
+    tmp = readNextInt4(ctn);
+    val = *((float*)&tmp);
+    p->controls.yaw = val;
+    tmp = readNextInt4(ctn);
+    val = *((float*)&tmp);
+    p->controls.pitch = val;
+    readNextInt4(ctn); // rv1
+    readNextInt4(ctn); // rv2
+    p->controls.inputStorage = readNextInt4(ctn);
 
     readNextBitsInt4(8, ctn); // Player Status
     p->processedEvents = readNextBitsInt4(16, ctn);
@@ -127,17 +145,22 @@ void sendGameUpdateAnswer(Server* server, RecvContainer* ctn)
     writeNextInt4Bits(server->gameStatus, 4, ctn);
     writeNextInt4Bits(server->tickTimer, 16, ctn);
     writeNextInt4Bits(0, 16, ctn);
-    writeNextInt4Bits(0, 6, ctn); // teams
+    writeNextInt4Bits(0, 6, ctn); // teams????
     writeNextInt4Bits(0, 6, ctn);
     writeNextInt4Bits(0, 6, ctn);
     writeNextInt4Bits(0, 6, ctn); // readPackets
 
-    writeNextInt4Bits(p->id, 8, ctn); // player ID
+    writeNextInt4Bits(p->id, 8, ctn);
 
     // idk
     writeNextInt4Bits(p->currentMenu, 8, ctn);
     writeNextInt4Bits(p->actions, 8, ctn);
-    writeNextInt4Bits(0, 8, ctn);
+    if (p->human) {
+        writeNextInt4Bits(p->human->health, 8, ctn);
+    }
+    else {
+        writeNextInt4Bits(0, 8, ctn);
+    }
     writeNextInt4Bits(0, 6, ctn);
     writeNextInt4Bits(0, 8, ctn);
 
@@ -146,9 +169,9 @@ void sendGameUpdateAnswer(Server* server, RecvContainer* ctn)
     writeNextInt4Bits(-1, 6, ctn); // HAND SLOT
     writeNextInt4Bits(-1, 6, ctn); // SLOT 1
     writeNextInt4Bits(-1, 6, ctn);
-    writeNextInt4Bits(2, 6, ctn);
-    writeNextInt4Bits(1, 6, ctn);
-    writeNextInt4Bits(3, 6, ctn);
+    writeNextInt4Bits(-1, 6, ctn);
+    writeNextInt4Bits(-1, 6, ctn);
+    writeNextInt4Bits(-1, 6, ctn);
 
     writeNextInt4Bits(0, 8, ctn);
 
@@ -163,9 +186,9 @@ void sendGameUpdateAnswer(Server* server, RecvContainer* ctn)
     }
 
     for(int i = 0; i < MAX_ACTUAL_PLAYERS; i++) {
-        writeNextInt4Bits(server->humans[i].isPlayed, 1, ctn); // is human i played?
+        writeNextInt4Bits(server->humans[i].isPlayed, 1, ctn);
         if (server->humans[i].isPlayed) {
-            writeNextInt4Bits(0, 8, ctn);
+            writeNextInt4Bits(-1, 8, ctn); // driven car
             writeNextInt4Bits(0, 2, ctn); // 0: driving hands, 1: right hand face forward
             packPosition(&server->humans[i].position, 12, ctn); // position
             writeNextInt4Bits(server->humans[i].health, 7, ctn);
@@ -177,8 +200,8 @@ void sendGameUpdateAnswer(Server* server, RecvContainer* ctn)
             packAngle(0, 16, ctn);
             packAngle(0, 16, ctn);
             packAngle(1.0, 16, ctn); // scrollAmount
-            packAngle(0, 16, ctn); // human pitch
-            packAngle(0, 16, ctn); // human yaw
+            packAngle(server->humans[i].pitch, 16, ctn); // human pitch
+            packAngle(server->humans[i].yaw, 16, ctn); // human yaw
         }
     }
 
@@ -357,6 +380,59 @@ void gameLogic(Server* server)
     }
 }
 
+void humanSimulation(Server* server, unsigned long delta)
+{
+    float deltaf = (float)(delta)/1000.0;
+    for (int i = 0; i < MAX_HUMANS; i++) {
+        Human* h = server->humans + i;
+        if (!h->isPlayed)
+            continue;
+        
+        Player* controller = h->player;
+
+        h->yaw = controller->controls.yaw;
+        h->pitch = controller->controls.pitch;
+
+        zeroVect(&h->acceleration);
+
+        getDirVectFromAngle(&h->facingDirection, 1, h->yaw);
+        copyVect(&h->acceleration, &h->facingDirection);
+        scaleVect(&h->acceleration, &h->acceleration, controller->controls.forwards);
+
+        Vect3D sideAccel;
+        getDirVectFromAngle(&sideAccel, controller->controls.rightwards, h->yaw + M_PI_2);
+        addVect(&h->acceleration, &h->acceleration, &sideAccel);
+
+        normalizeVect(&h->acceleration, &h->acceleration);
+        scaleVect(&h->acceleration, &h->acceleration, ACCEL_STRENGTH);
+
+        scaleVect(&h->speed, &h->speed, 0.99); // damp speed
+
+        Vect3D appliedVect;
+        scaleVect(&appliedVect, &h->acceleration, deltaf);
+        addVect(&h->speed, &h->speed, &appliedVect);
+        
+        scaleVect(&appliedVect, &h->speed, deltaf);
+        addVect(&h->position, &h->position, &appliedVect);
+
+        printf("Len: %f\n", lengthVect(&h->speed));
+    }
+}
+
+/**
+ * @brief PHYSICS! PHYSICS PHYSICS PHYSICS! PHY SICS!!!
+ */
+void physicsSimulation(Server* server, unsigned long delta)
+{
+    // particles
+    // object
+    humanSimulation(server, delta);
+    // item sim
+    // bond sim
+    // item logic
+    // item ttl
+}
+
 int main(int argc, const char **argv)
 {
     endianCheck();
@@ -405,11 +481,14 @@ int main(int argc, const char **argv)
     unsigned long v5 = systemtimer();
     do {
         usleep(10000);
+        unsigned long ms = systemtimer()-v5;
         
         serverRecv(server, &ctn);
 
         playerLogic(server);
-
+        if (server->gameStatus != GameStatus::ENDING) {
+            physicsSimulation(server, ms);
+        }
         // physics logic
 
         gameLogic(server);
@@ -417,5 +496,6 @@ int main(int argc, const char **argv)
         sendRoutine(server, &ctn);
 
         server->tickElapsed++;
+        v5 = systemtimer();
     } while(true);
 }

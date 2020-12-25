@@ -39,7 +39,7 @@ void createEventUpdatePlayer(Server* server, Player* player)
     ev->info.updatePlayer.playerId = player->id;
     ev->info.updatePlayer.teamId = player->team;
     ev->info.updatePlayer.cashAmt = player->cash;
-    ev->info.updatePlayer.unknown = 0;
+    ev->info.updatePlayer.unknown = 2;
     int i = 0;
     for (; i < 31 && player->username[i] != '\0'; i++) {
         ev->info.updatePlayer.username[i] = player->username[i];
