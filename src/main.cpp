@@ -43,11 +43,12 @@ void handleClientUpdate(Server* server, RecvContainer* ctn)
     if (p->status == PlayerStatus::LOADING && curGame == server->curGame) {
         p->status = PlayerStatus::LOBBY;
     }
-    readNextInt4(ctn); // idk2
-    int tmp = readNextInt4(ctn);
+    int tmp;
+    tmp = readNextInt4(ctn); // idk2
+    tmp = readNextInt4(ctn);
     float val = *((float*)&tmp);
     p->controls.rightwards = val;
-    readNextInt4(ctn); // idk1
+    tmp = readNextInt4(ctn); // idk1
     tmp = readNextInt4(ctn);
     val = *((float*)&tmp);
     p->controls.forwards = val;
@@ -57,11 +58,11 @@ void handleClientUpdate(Server* server, RecvContainer* ctn)
     tmp = readNextInt4(ctn);
     val = *((float*)&tmp);
     p->controls.pitch = val;
-    readNextInt4(ctn); // rv1
-    readNextInt4(ctn); // rv2
+    tmp = readNextInt4(ctn); // rv1
+    tmp = readNextInt4(ctn); // rv2
     p->controls.inputStorage = readNextInt4(ctn);
 
-    readNextBitsInt4(8, ctn); // Player Status
+    tmp = readNextBitsInt4(8, ctn); // Player Status
     p->processedEvents = readNextBitsInt4(16, ctn);
     int evtAmt = readNextBitsInt4(3, ctn);
     readNextBitsInt4(6, ctn);
@@ -369,7 +370,7 @@ void gameLogic(Server* server)
             if (server->players[i].status == PlayerStatus::INVALID)
                 continue;
             if (server->players[i].isReady == 1 && !server->players[i].human) {
-                createHuman(server, (Vect3D){512.0,64.0,512.0}, &server->players[i]);
+                createHuman(server, (Vect3D){512.0,16.0,512.0}, &server->players[i]);
                 if (!server->players[i].human)
                     continue;
                 server->players[i].isReady = 2;
@@ -415,7 +416,7 @@ void humanSimulation(Server* server, unsigned long delta)
         scaleVect(&appliedVect, &h->speed, deltaf);
         addVect(&h->position, &h->position, &appliedVect);
 
-        printf("Len: %f\n", lengthVect(&h->speed));
+        printf("Pos: %f %f %f\n", h->position.x, h->position.y, h->position.z);
     }
 }
 
